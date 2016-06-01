@@ -1,0 +1,152 @@
+version: '2'
+services:
+  # source control management service / issue tracker / wiki
+  gogs_db_service:
+    image: mysql:5.6
+    ports:
+      - "3307:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: almAdmin2016!
+      MYSQL_USER: gogs
+      MYSQL_PASSWORD: almGoGs2016!
+      MYSQL_DATABASE: gogs
+    volumes:
+      - gogs_mysql_volume:/var/lib/mysql
+
+  # scm-service
+  gogs_service:
+    image: gogs/gogs:latest
+    ports:
+      - "10022:22"
+      - "10080:3000"
+    links:
+      - gogs_db_service:gogsdb
+    volumes:
+      - gogs_repositories_volume:/data/git/gogs-repositories
+      - gogs_data_volume:/data
+    environment:
+      # database
+      DB_TYPE: mysql
+      HOST: gogsdb:3306
+      NAME: gogs
+      USER: gogs
+      PASSWD: almGoGs2016!
+      # server
+      DOMAIN: docker
+      ROOT_URL: http://docker:10080/
+
+#  # project management / issue tracker service
+#  mysql-redmine:
+#    image: mysql:5.6
+#    ports:
+#      - "3408:3306"
+#    environment:
+#      MYSQL_ROOT_PASSWORD: almAdmin2016!
+#      MYSQL_USER: redmine
+#      MYSQL_PASSWORD: almRedmine2016!
+#      MYSQL_DATABASE: redmine
+#
+#  #redmine-service:
+#  pmit-service:
+#    image: redmine:3.2.0
+#    ports:
+#      - "20080:3000"
+#    links: 
+#      - mysql-redmine
+
+  # continuous integration service
+  # ci-service:
+  jenkins_service:
+    image: jenkins:1.642.1
+    ports:
+      - "18080:8080"
+      - "50000:50000"
+
+  # ci/cd qa - sonarqube
+  sonarqube_db_service:
+    image: mysql:5.6
+    ports:
+      - "3507:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: almAdmin2016!
+      MYSQL_USER: sonarqube
+      MYSQL_PASSWORD: almGoGs2016!
+      MYSQL_DATABASE: sonarqube
+    volumes:
+      - sonarqube_mysql_volume:/var/lib/mysql
+
+  #ci-cd-qa
+  sonarqube_service:
+    # 4.5.6 LTS, 5.4 latest
+    image: sonarqube
+    ports:
+      - "9000:9000"
+      - "9092:9092"
+    environment:
+      SONARQUBE_JDBC_USERNAME: sonarqube
+      SONARQUBE_JDBC_PASSWORD: almGoGs2016!
+      SONARQUBE_JDBC_URL: "jdbc:mysql://sonardb:3306/sonarqube?useUnicode=true&characterEncoding=utf8"
+    links:
+      - sonarqube_db_service:sonardb
+      - jenkins_service:jenkins
+    volumes:
+      - sonarqube_data_volume:/opt/sonarqube/data
+      - sonarqube_extensions_volume:/opt/sonarqube/extensions
+
+  # software repository service
+  nexus_service:
+    image: sonatype/nexus3
+    ports:
+      - "18081:8081"
+    volumes:
+      - nexus_data_volume:/opt/nexus/data
+    environment:
+      # passed as -Dnexus-webapp-context-path. This is used 
+      # to define the URL which Nexus is accessed.    
+      CONTEXT_PATH: nexus
+      # passed as -Xmx. Defaults to 768m.
+      # MAX_HEAP:
+      # passed as -Xms. Defaults to 256m. 
+      # MIN_HEAP:
+      # Additional options can be passed to the JVM via this variable.
+      # Default: -server -XX:MaxPermSize=192m -Djava.net.preferIPv4Stack=true.
+      # JAVA_OPTS:
+      # A list of configuration files supplied to the
+      # Nexus bootstrap launcher. Default: ./conf/jetty.xml ./conf/jetty-requestlog.xml
+      # LAUNCHER_CONF:
+
+  # gateway
+  nginx-service:
+    image: nginx:1.9.11
+    #depends_on:
+    #  - gogs_service
+    #  - sonarqube_service
+    #  - nexus_service
+    #  - jenkins_service
+    links:
+      - gogs_service:gogs
+      - sonarqube_service:sonar
+      - nexus_service:nexus
+      - jenkins_service:jenkins
+    ports:
+      - "9080:80"
+      - "9443:443"
+
+volumes:
+  gogs_mysql_volume:
+    #external:
+    #    name: 
+    ######## OR ##########
+    driver: local
+  gogs_repositories_volume: 
+    driver: local
+  gogs_data_volume: 
+    driver: local
+  sonarqube_mysql_volume:
+    driver: local
+  sonarqube_data_volume:
+    driver: local
+  sonarqube_extensions_volume:
+    driver: local
+  nexus_data_volume:
+    driver: local
